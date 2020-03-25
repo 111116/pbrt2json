@@ -1,10 +1,14 @@
-#include "consolelog.hpp"
-#include "math/matfloat.hpp"
+
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <vector>
+#include <unordered_map>
+#include "consolelog.hpp"
+#include "math/matfloat.hpp"
 
 using std::string;
+
 
 bool isString(std::istream& in) {
 	while (isspace(in.peek())) in.get();
@@ -45,33 +49,76 @@ mat4f getMatrix(std::istream& in) {
 	return a;
 }
 
+std::ostream& operator<< (std::ostream& out, const mat4f& m) {
+	for (int i=0; i<4; ++i)
+		for (int j=0; j<4; ++j)
+			out << ((i||j)? ",": "[") << m[i][j];
+	return out << "]";
+}
+
+
+
+std::vector<mat4f> transforms;
+
+mat4f curtrans() {
+	mat4f t = mat4f::unit;
+	for (auto a: transforms)
+		t = t * a;
+	return t;
+}
+
+
+typedef std::vector<std::pair<string, mat4f>> Obj;
+
+std::unordered_map<string, Obj> objs;
+
+
+
 int main(int argc, char* argv[])
 {
-	try {
+	try
+	{
 	std::ifstream fin(argv[1]);
+
 	string cmd, lastcmd;
+	string curobjname;
+	Obj curobj;
+	int dep = 0;
+
 	while (lastcmd=cmd, fin >> cmd) {
 		// console.log(cmd);
 		if (cmd == "") {
 			continue;
 		}
 		if (cmd == "AttributeBegin") {
+			dep++;
+			transforms.push_back(mat4f::unit);
 			continue;
 		}
 		if (cmd == "AttributeEnd") {
+			dep--;
+			transforms.pop_back();
 			continue;
 		}
 		if (cmd == "ObjectBegin") {
-			string type = getString(fin);
+			curobjname = getString(fin);
+			curobj.clear();
+			transforms.push_back(mat4f::unit);
 			continue;
 		}
 		if (cmd == "ObjectEnd") {
+			objs[curobjname] = curobj;
+			transforms.pop_back();
 			continue;
 		}
 		if (cmd == "Shape") {
-			string a = getString(fin);
-			string b = getString(fin);
-			string c = getString(fin);
+			string type = getString(fin);
+			string ftype = getString(fin);
+			string file = getString(fin);
+			if (type != "plymesh") throw "s";
+			if (ftype != "string filename") throw "s";
+			curobj.push_back({file, curtrans()});
+			// get attr
 			while (isString(fin)) {
 				string key = getString(fin);
 				getString(fin);
@@ -94,6 +141,7 @@ int main(int argc, char* argv[])
 		}
 		if (cmd == "ConcatTransform") {
 			mat4f m = getMatrix(fin);
+			transforms.back() = m;
 			continue;
 		}
 		if (cmd == "Rotate") {
@@ -138,4 +186,5 @@ int main(int argc, char* argv[])
 		console.error(err);
 		return 1;
 	}
+	console.info("total",objs.size(), "objs");
 }
