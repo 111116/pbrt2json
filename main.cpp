@@ -137,7 +137,10 @@ int main(int argc, char* argv[])
 			continue;
 		}
 		if (cmd == "ObjectEnd") {
-			objs[curobjname] = curobj;
+			if (objs.count(curobjname))
+				objs[curobjname].insert(objs[curobjname].end(), curobj.begin(), curobj.end());
+			else
+				objs[curobjname] = curobj;
 			transforms.pop_back();
 			curobj.clear();
 			continue;
