@@ -61,6 +61,7 @@ std::ostream& operator<< (std::ostream& out, const mat4f& m) {
 
 struct Mesh {
 	string file;
+	string bsdf;
 	mat4f trans;
 };
 typedef std::vector<Mesh> Obj;
@@ -68,14 +69,17 @@ typedef std::vector<Mesh> Obj;
 void printobj(std::ostream& out, const Obj& o, mat4f trans = mat4f::unit)
 {
 	static bool t0 = 0;
-	if (!t0) t0=1;
-	else out << ",\n";
+	if (o.size()>0) {
+		if (!t0) t0=1;
+		else out << ",\n";
+	}
 
 	bool t = 0;
 	for (auto m: o) {
 		if (!t) t=1;
 		else out << ",";
 		out << "{\"type\":\"mesh\",\"file\":\"" << m.file
+			<< "\",\"bsdf\":\"" << m.bsdf
 			<< "\",\"transform\":" << trans*m.trans << "}";
 	}
 }
@@ -145,9 +149,10 @@ int main(int argc, char* argv[])
 			if (type != "plymesh") throw "s";
 			if (ftype != "string filename") throw "s";
 			if (file.substr(file.length()-3)!="ply") throw "ply";
-			file = file.substr(0,file.length()-3) + "obj";
+			if (file.substr(0,8)!="geometry") throw "geo";
+			file = "mesh"+file.substr(8,file.length()-11) + "obj";
 
-			curobj.push_back({file, curtrans()});
+			curobj.push_back({file, "default", curtrans()});
 			// get attr
 			while (isString(fin)) {
 				string key = getString(fin);
