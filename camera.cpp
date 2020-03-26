@@ -92,12 +92,12 @@ int main(int argc, char* argv[])
 
 		vec3f pos = transposed(R)*-T;
 		vec3f dir = transposed(R)*vec3f(0,0,1);
-		vec3f up = normalized(cross(dir, cross(vec3f(0,1,0), dir)));
+		vec3f up = normalized(transposed(R)*vec3f(0,1,0));
 		vec3f lookat = pos + 1000*dir;
 
-		std::cout << "\"position\": [" << pos.x << "," << pos.y << "," << pos.z << "],\n";
-		std::cout << "\"look_at\": [" << lookat.x << "," << lookat.y << "," << lookat.z << "],\n";
-		std::cout << "\"up\": [" << up.x << "," << up.y << "," << up.z << "]\n";
+		std::cout << "            \"position\": [" << pos.x << "," << pos.y << "," << pos.z << "],\n";
+		std::cout << "            \"look_at\": [" << lookat.x << "," << lookat.y << "," << lookat.z << "],\n";
+		std::cout << "            \"up\": [" << up.x << "," << up.y << "," << up.z << "]\n";
 
 	}
 	catch (const char* err) {
