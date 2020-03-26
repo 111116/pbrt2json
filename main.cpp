@@ -131,6 +131,7 @@ int main(int argc, char* argv[])
 		}
 		if (cmd == "ObjectBegin") {
 			curobjname = getString(fin);
+			printobj(fout, curobj);
 			curobj.clear();
 			transforms.push_back(mat4f::unit);
 			continue;
@@ -138,7 +139,7 @@ int main(int argc, char* argv[])
 		if (cmd == "ObjectEnd") {
 			objs[curobjname] = curobj;
 			transforms.pop_back();
-			// printobj(fout, curobj);
+			curobj.clear();
 			continue;
 		}
 		if (cmd == "Shape") {
@@ -217,6 +218,8 @@ int main(int argc, char* argv[])
 		console.error("unrecognized cmd", cmd);
 		return 1;
 	}
+	printobj(fout, curobj);
+	curobj.clear();
 	fout << "\n]\n";
 	}
 	catch (const char* err) {
