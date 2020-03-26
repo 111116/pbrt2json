@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
 		if (cmd == "ObjectEnd") {
 			objs[curobjname] = curobj;
 			transforms.pop_back();
-			printobj(fout, curobj);
+			// printobj(fout, curobj);
 			continue;
 		}
 		if (cmd == "Shape") {
