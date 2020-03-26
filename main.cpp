@@ -58,6 +58,30 @@ std::ostream& operator<< (std::ostream& out, const mat4f& m) {
 
 
 
+
+struct Mesh {
+	string file;
+	mat4f trans;
+};
+typedef std::vector<Mesh> Obj;
+
+void printobj(std::ostream& out, const Obj& o, mat4f trans = mat4f::unit)
+{
+	static bool t0 = 0;
+	if (!t0) t0=1;
+	else out << ",\n";
+
+	bool t = 0;
+	for (auto m: o) {
+		if (!t) t=1;
+		else out << ",";
+		out << "{\"type\":\"mesh\",\"file\":\"" << m.file
+			<< "\",\"transform\":" << trans*m.trans << "}";
+	}
+}
+
+std::unordered_map<string, Obj> objs;
+
 std::vector<mat4f> transforms;
 
 mat4f curtrans() {
@@ -68,22 +92,23 @@ mat4f curtrans() {
 }
 
 
-typedef std::vector<std::pair<string, mat4f>> Obj;
-
-std::unordered_map<string, Obj> objs;
-
-
 
 int main(int argc, char* argv[])
 {
+	if (argc != 3) {
+		return 1;
+	}
 	try
 	{
 	std::ifstream fin(argv[1]);
+	std::ofstream fout(argv[2]);
 
 	string cmd, lastcmd;
 	string curobjname;
 	Obj curobj;
 	int dep = 0;
+
+	fout << "[\n";
 
 	while (lastcmd=cmd, fin >> cmd) {
 		// console.log(cmd);
@@ -109,14 +134,19 @@ int main(int argc, char* argv[])
 		if (cmd == "ObjectEnd") {
 			objs[curobjname] = curobj;
 			transforms.pop_back();
+			printobj(fout, curobj);
 			continue;
 		}
 		if (cmd == "Shape") {
 			string type = getString(fin);
 			string ftype = getString(fin);
 			string file = getString(fin);
+			// ply to obj
 			if (type != "plymesh") throw "s";
 			if (ftype != "string filename") throw "s";
+			if (file.substr(file.length()-3)!="ply") throw "ply";
+			file = file.substr(0,file.length()-3) + "obj";
+
 			curobj.push_back({file, curtrans()});
 			// get attr
 			while (isString(fin)) {
@@ -137,6 +167,7 @@ int main(int argc, char* argv[])
 		}
 		if (cmd == "ObjectInstance") {
 			string name = getString(fin);
+			printobj(fout, objs[name], curtrans());
 			continue;
 		}
 		if (cmd == "ConcatTransform") {
@@ -181,6 +212,7 @@ int main(int argc, char* argv[])
 		console.error("unrecognized cmd", cmd);
 		return 1;
 	}
+	fout << "\n]\n";
 	}
 	catch (const char* err) {
 		console.error(err);
