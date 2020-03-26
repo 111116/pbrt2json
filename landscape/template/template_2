@@ -1,0 +1,18 @@
+        },
+        "type": "pinhole",
+        "fov": 44.0
+    },
+    "bsdfs": [
+        {
+            "name": "default",
+            "albedo": 0.7,
+            "type": "lambert"
+        }
+    ],
+    "emissions": [
+        {
+            "type": "constant",
+            "radiance": 1
+        }
+    ],
+    "primitives":

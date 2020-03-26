@@ -1,0 +1,33 @@
+{
+    "integrator": {
+        "max_bounces": 5
+    },
+    "renderer": {
+        "spp": 4,
+        "output_files": ["view-1.png", "view-1.exr"]
+    },
+    "camera": {
+        "resolution": [ 4096, 2304 ],
+        "transform": {
+			"mirror": true,
+            "position": [-3038.28,1880,-3689.17],
+            "look_at": [-2675.65,1489.27,-2843.1],
+            "up": [0.153925,0.920505,0.359135]
+        },
+        "type": "pinhole",
+        "fov": 65.470452
+    },
+    "bsdfs": [
+        {
+            "name": "default",
+            "albedo": 0.7,
+            "type": "lambert"
+        }
+    ],
+    "emissions": [
+        {
+            "type": "constant",
+            "radiance": 1
+        }
+    ],
+    "primitives":

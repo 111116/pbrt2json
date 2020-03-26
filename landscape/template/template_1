@@ -1,0 +1,12 @@
+{
+    "integrator": {
+        "max_bounces": 5
+    },
+    "renderer": {
+        "spp": 4,
+        "output_files": ["landscape.png", "landscape.exr"]
+    },
+    "camera": {
+        "resolution": [ 4096, 2304 ],
+        "transform": {
+			"mirror": true,
