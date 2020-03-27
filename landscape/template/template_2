@@ -11,8 +11,17 @@
     ],
     "emissions": [
         {
-            "type": "constant",
-            "radiance": 1
+            "type": "directional",
+            "direction": [ 
+                0.8896092772
+                -0.453111738
+                -0.0573157743
+            ],
+            "irradiance": [ 3.1359820366, 2.4853198528, 1.4146273136 ]
+        },
+        {
+            "type": "envmap",
+            "file": "textures/environment_Reflection.exr"
         }
     ],
     "primitives":
