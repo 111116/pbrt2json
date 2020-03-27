@@ -35,17 +35,19 @@ void getArray(std::istream& in) {
 	in.get();
 }
 
-mat4f getMatrix(std::istream& in) {
+void skip(std::istream& in, char c) {
 	while (isspace(in.peek())) in.get();
-	if (in.peek() != '[') throw "mat:wtf1";
+	if (in.peek() != c) throw "skip fail";
 	in.get();
+}
+
+mat4f getMatrix(std::istream& in) {
 	mat4f a;
+	skip(in,'[');
 	for (int i=0; i<4; ++i)
 		for (int j=0; j<4; ++j)
 			in >> a[j][i];
-	while (isspace(in.peek())) in.get();
-	if (in.peek() != ']') throw "mat:wtf2";
-	in.get();
+	skip(in,']');
 	return a;
 }
 
@@ -56,7 +58,110 @@ std::ostream& operator<< (std::ostream& out, const mat4f& m) {
 	return out << "]";
 }
 
+// map name to bsdfID
+std::unordered_map<string, string> namedMaterial;
+std::unordered_map<string, string> textures;
 
+
+void getMtl(std::istream& in, std::ostream& out, string name, string type="")
+{
+	static bool printcomma = 0;
+	if (!printcomma) printcomma = 1;
+	else out << ",\n";
+
+	auto passattr = [&](string type, string name) {
+		out << ",\"" << name << "\":";
+		skip(in,'[');
+		if (type == "string") {
+			string val = getString(in);
+			out << "\"" << val << "\"";
+		}
+		if (type == "texture") {
+			string val = getString(in);
+			if (!textures.count(val)) throw "undefined texture";
+			out << "\"" << textures[val] << "\"";
+		}
+		if (type == "float") {
+			double val;
+			in >> val;
+			out << val;
+		}
+		if (type == "rgb") {
+			double a,b,c;
+			in >> a >> b >> c;
+			out << "[" << a << "," << b << "," << c << "]";
+		}
+		skip(in,']');
+	};
+
+	out << "{\"name\":\"" << name << "\"";
+	if (type != "")
+		out << ",\"type\":\"" << type << "\"";
+	while (isString(in))
+	{
+		string key = getString(in);
+		int spaceindex = key.find(" ");
+		if (spaceindex == string::npos) throw "bsdfkey fail";
+		string keytype = key.substr(0, spaceindex);
+		string keyname = key.substr(spaceindex+1, key.length()-spaceindex-1);
+
+		if (keyname == "type") {
+			if (keytype != "string") throw "type mismatch";
+			passattr("string","type");
+			continue;
+		}
+		if (keyname == "index") {
+			if (keytype != "float") throw "type mismatch";
+			passattr("float", "ior");
+			continue;
+		}
+		if (keyname == "roughness") {
+			if (keytype != "float") throw "type mismatch";
+			passattr("float", "roughness");
+			continue;
+		}
+		if (keyname == "Kd" || keyname == "Ks" || keyname == "Kr" || keyname == "Kt") {
+			if (keytype == "rgb")
+				passattr("rgb", keyname);
+			else if (keytype == "texture")
+				passattr("texture", keyname);
+			else throw "type mismatch";
+			continue;
+		}
+		if (keyname == "bumpmap") {
+			if (keytype != "texture") throw "type mismatch";
+			passattr("texture", "bumpmap");
+			continue;
+		}
+		if (keyname == "reflect") {
+			if (keytype != "rgb") throw "type mismatch";
+			passattr("rgb", "reflect");
+			continue;
+		}
+		if (keyname == "transmit") {
+			if (keytype != "rgb") throw "type mismatch";
+			passattr("rgb", "transmit");
+			continue;
+		}
+		if (keyname == "namedmaterial1") {
+			if (keytype != "string") throw "type mismatch";
+			passattr("string","material1");
+			continue;
+		}
+		if (keyname == "namedmaterial2") {
+			if (keytype != "string") throw "type mismatch";
+			passattr("string","material2");
+			continue;
+		}
+		if (keyname == "amount") {
+			if (keytype != "rgb") throw "type mismatch";
+			passattr("rgb", "amount");
+			continue;
+		}
+		console.warn(type,"unrecognized bsdf key", key);
+	}
+	out << "}";
+}
 
 
 struct Mesh {
@@ -73,7 +178,6 @@ void printobj(std::ostream& out, const Obj& o, mat4f trans = mat4f::unit)
 		if (!t0) t0=1;
 		else out << ",\n";
 	}
-
 	bool t = 0;
 	for (auto m: o) {
 		if (!t) t=1;
@@ -99,17 +203,22 @@ mat4f curtrans() {
 
 int main(int argc, char* argv[])
 {
-	if (argc != 3) {
+	if (argc != 4) {
+		console.info(argv[0], "pbrt out mtlout");
 		return 1;
 	}
+	int mtlcnt = 0;
 	try
 	{
 	std::ifstream fin(argv[1]);
 	std::ofstream fout(argv[2]);
+	std::ofstream mout(argv[3]);
 
 	string cmd, lastcmd;
 	string curobjname;
 	Obj curobj;
+	string curmtl = "undefined";
+
 	int dep = 0;
 
 	fout << "[\n";
@@ -156,7 +265,7 @@ int main(int argc, char* argv[])
 			if (file.substr(0,8)!="geometry") throw "geo";
 			file = "mesh"+file.substr(8,file.length()-11) + "obj";
 
-			curobj.push_back({file, "default", curtrans()});
+			curobj.push_back({file, curmtl, curtrans()});
 			// get attr
 			while (isString(fin)) {
 				string key = getString(fin);
@@ -165,12 +274,18 @@ int main(int argc, char* argv[])
 			continue;
 		}
 		if (cmd == "Texture") {
-			string a = getString(fin);
-			string b = getString(fin);
-			string c = getString(fin);
+			string name = getString(fin);
+			string valtype = getString(fin);
+			string textype = getString(fin);
+			if (textype != "imagemap") throw "unrecognized texture type";
+			if (valtype != "spectrum" && valtype != "float") throw "unrecognized texture valtype";
 			while (isString(fin)) {
 				string key = getString(fin);
-				getArray(fin);
+				if (key != "string filename") throw "unrecognized texture attr";
+				skip(fin, '[');
+				std::string file = getString(fin);
+				skip(fin, ']');
+				textures[name] = file;
 			}
 			continue;
 		}
@@ -196,18 +311,17 @@ int main(int argc, char* argv[])
 		}
 		if (cmd == "Material") {
 			string type = getString(fin);
-			while (isString(fin)) {
-				string key = getString(fin);
-				getArray(fin);
-			}
+			++mtlcnt;
+			curmtl = "m" + std::to_string(mtlcnt);
+			getMtl(fin, mout, curmtl, type);
 			continue;
 		}
 		if (cmd == "MakeNamedMaterial") {
-			string type = getString(fin);
-			while (isString(fin)) {
-				string key = getString(fin);
-				getArray(fin);
-			}
+			string name = getString(fin);
+			++mtlcnt;
+			curmtl = "m" + std::to_string(mtlcnt);
+			namedMaterial[name] = curmtl;
+			getMtl(fin, mout, curmtl);
 			continue;
 		}
 		if (cmd == "LightSource") {
@@ -230,4 +344,5 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	console.info("total",objs.size(), "objs");
+	console.info("total",mtlcnt, "mtls");
 }
