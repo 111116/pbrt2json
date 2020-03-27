@@ -63,10 +63,11 @@ std::unordered_map<string, string> namedMaterial;
 std::unordered_map<string, string> textures;
 
 
+static bool mtlglob_printcomma = 0;
+
 void getMtl(std::istream& in, std::ostream& out, string name, string type="")
 {
-	static bool printcomma = 0;
-	if (!printcomma) printcomma = 1;
+	if (!mtlglob_printcomma) mtlglob_printcomma = 1;
 	else out << ",\n";
 
 	auto passattr = [&](string type, string name) {
@@ -80,6 +81,11 @@ void getMtl(std::istream& in, std::ostream& out, string name, string type="")
 			string val = getString(in);
 			if (!textures.count(val)) throw "undefined texture";
 			out << "\"" << textures[val] << "\"";
+		}
+		if (type == "namedmaterial") {
+			string val = getString(in);
+			if (!namedMaterial.count(val)) throw "undefined namedmaterial";
+			out << "\"" << namedMaterial[val] << "\"";
 		}
 		if (type == "float") {
 			double val;
@@ -145,12 +151,12 @@ void getMtl(std::istream& in, std::ostream& out, string name, string type="")
 		}
 		if (keyname == "namedmaterial1") {
 			if (keytype != "string") throw "type mismatch";
-			passattr("string","material1");
+			passattr("namedmaterial","material1");
 			continue;
 		}
 		if (keyname == "namedmaterial2") {
 			if (keytype != "string") throw "type mismatch";
-			passattr("string","material2");
+			passattr("namedmaterial","material2");
 			continue;
 		}
 		if (keyname == "amount") {
@@ -267,9 +273,29 @@ int main(int argc, char* argv[])
 
 			curobj.push_back({file, curmtl, curtrans()});
 			// get attr
+			string alphaname;
 			while (isString(fin)) {
 				string key = getString(fin);
-				getString(fin);
+				string attr = getString(fin);
+				if (key == "texture alpha") {
+					if (!textures.count(attr)) throw "undef alphatex";
+					alphaname = attr;
+					++mtlcnt;
+					string basemtl = curmtl;
+					curmtl = std::to_string(1000+mtlcnt);
+					curmtl[0] = 'm';
+					curobj.back().bsdf = curmtl;
+					if (!mtlglob_printcomma) mtlglob_printcomma = 1;
+					else mout << ",\n";
+					mout << "{\"name\":\"" << curmtl
+						<< "\",\"type\":\"transparency\",\"base\":\""
+						<< basemtl << "\",\"alpha\":\""
+						<< textures[attr] << "\"}";
+				}
+				else if (key == "texture shadowalpha") {
+					if (alphaname != attr) throw "unmatch shadowalpha";
+				}
+				else throw "unrecognized shape attr";
 			}
 			continue;
 		}
@@ -312,14 +338,16 @@ int main(int argc, char* argv[])
 		if (cmd == "Material") {
 			string type = getString(fin);
 			++mtlcnt;
-			curmtl = "m" + std::to_string(mtlcnt);
+			curmtl = std::to_string(1000+mtlcnt);
+			curmtl[0] = 'm';
 			getMtl(fin, mout, curmtl, type);
 			continue;
 		}
 		if (cmd == "MakeNamedMaterial") {
 			string name = getString(fin);
 			++mtlcnt;
-			curmtl = "m" + std::to_string(mtlcnt);
+			curmtl = std::to_string(1000+mtlcnt);
+			curmtl[0] = 'm';
 			namedMaterial[name] = curmtl;
 			getMtl(fin, mout, curmtl);
 			continue;
